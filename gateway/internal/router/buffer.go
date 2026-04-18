@@ -75,6 +75,23 @@ func (rb *RingBuffer) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// TryRead attempts a non-blocking read, returning available data immediately
+func (rb *RingBuffer) TryRead(p []byte) (int, error) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	if rb.read.Load() >= rb.write.Load() {
+		if rb.closed {
+			return 0, io.EOF
+		}
+		return 0, nil // no data available
+	}
+
+	n := copy(p, rb.data[rb.read.Load()%BufferSize:])
+	rb.read.Add(int64(n))
+	return n, nil
+}
+
 func (rb *RingBuffer) Available() int {
 	return int(rb.write.Load() - rb.read.Load())
 }
