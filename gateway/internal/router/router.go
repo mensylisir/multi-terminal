@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -80,6 +81,15 @@ func (r *Router) aggregate() {
 			return true
 		}
 
+		// Backpressure: check water marks
+		if rb.IsHigh() && !s.GetSlow() {
+			s.SetSlow(true)
+			r.sendSlowWarning(sessionID, true)
+		} else if rb.IsLow() && s.GetSlow() {
+			s.SetSlow(false)
+			r.sendSlowWarning(sessionID, false)
+		}
+
 		// Skip slow nodes
 		if s.GetSlow() {
 			return true
@@ -110,4 +120,21 @@ func (r *Router) aggregate() {
 		serialized := frame.Serialize()
 		r.hub.Broadcast(serialized)
 	}
+}
+
+func (r *Router) sendSlowWarning(sessionID uint32, isSlow bool) {
+	data := []byte(fmt.Sprintf(`{"type":"slow","sessionId":%d,"isSlow":%v}`, sessionID, isSlow))
+
+	frame := &codec.Frame{
+		Type:         0x06, // SlowWarning frame type
+		SessionCount: 1,
+		Sessions: []codec.SessionBlock{
+			{
+				SessionID: sessionID,
+				Length:    uint16(len(data)),
+				Data:      data,
+			},
+		},
+	}
+	r.hub.Broadcast(frame.Serialize())
 }
