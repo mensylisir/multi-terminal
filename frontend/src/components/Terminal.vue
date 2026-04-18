@@ -19,6 +19,7 @@ const emit = defineEmits<{
 const terminalRef = ref<HTMLElement | null>(null);
 let terminal: Terminal | null = null;
 let webglAddon: WebglAddon | null = null;
+let webglEnabled = false;
 
 // rAF throttling
 let outputQueue: string[] = [];
@@ -56,14 +57,37 @@ function initTerminal() {
     scrollback: 5000,
   });
 
+  // Attempt WebGL with proper addon configuration
   try {
     webglAddon = new WebglAddon();
+    webglAddon.onContextLoss(() => {
+      console.warn('WebGL context lost, falling back to canvas');
+      webglEnabled = false;
+      if (webglAddon) {
+        webglAddon.dispose();
+        webglAddon = null;
+      }
+    });
+
+    // Load addon - if this succeeds, WebGL is available
     terminal.loadAddon(webglAddon);
+    webglEnabled = true;
+    console.log('WebGL rendering enabled');
+
   } catch (e) {
-    console.warn('WebGL not available, falling back to canvas');
+    console.warn('WebGL not available, falling back to canvas:', e);
+    if (webglAddon) {
+      webglAddon.dispose();
+      webglAddon = null;
+    }
   }
 
   terminal.open(terminalRef.value);
+
+  // Fallback if WebGL context doesn't initialize
+  if (!webglEnabled && !webglAddon) {
+    console.log('Using Canvas renderer');
+  }
 }
 
 function handleResize() {
@@ -88,8 +112,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  if (webglAddon) {
+    webglAddon.dispose();
+  }
   terminal?.dispose();
-  webglAddon?.dispose();
 });
 </script>
 
