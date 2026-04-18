@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: monitoring
+data:
+  alerts.yaml: |
+    groups:
+      - name: gateway_alerts
+        rules:
+          - alert: FDUsageHigh
+            expr: gateway_fd_usage_percent > 85
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Gateway FD usage above 85%"
+              description: "File descriptor usage is {{ $value }}%"
+
+          - alert: SSHSessionLimitWarning
+            expr: gateway_ssh_sessions_total > 1600
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "SSH sessions approaching limit"
+              description: "SSH sessions at {{ $value }}, approaching max capacity"
+
+          - alert: SlowNodesHigh
+            expr: gateway_slow_nodes_total > 5
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Multiple slow nodes detected"
+              description: "{{ $value }} nodes are slow"
+
+          - alert: StreamRouterLatencyHigh
+            expr: histogram_quantile(0.95, gateway_stream_router_latency_ms_bucket{}) > 20
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Stream router latency above 20ms"
+              description: "p95 latency is {{ $value }}ms"
