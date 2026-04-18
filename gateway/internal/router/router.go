@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 

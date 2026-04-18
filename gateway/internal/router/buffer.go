@@ -87,7 +87,27 @@ func (rb *RingBuffer) TryRead(p []byte) (int, error) {
 		return 0, nil // no data available
 	}
 
-	n := copy(p, rb.data[rb.read.Load()%BufferSize:])
+	// Calculate available bytes and wrap point
+	available := int(rb.write.Load() - rb.read.Load())
+	readPos := int(rb.read.Load() % BufferSize)
+	spaceBeforeWrap := BufferSize - readPos
+
+	// Determine how many bytes we can read
+	n := len(p)
+	if n > available {
+		n = available
+	}
+
+	// Handle potential wrap-around
+	if n <= spaceBeforeWrap {
+		// Data is contiguous, read directly
+		copy(p[:n], rb.data[readPos:readPos+n])
+	} else {
+		// Data wraps around, read in two parts
+		copy(p[:spaceBeforeWrap], rb.data[readPos:readPos+spaceBeforeWrap])
+		copy(p[spaceBeforeWrap:n], rb.data[:n-spaceBeforeWrap])
+	}
+
 	rb.read.Add(int64(n))
 	return n, nil
 }
