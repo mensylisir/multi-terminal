@@ -111,3 +111,13 @@ func (p *ptySession) Close() error {
 	p.stdin.Close()
 	return p.session.Close()
 }
+
+// SetReadDeadline sets the read deadline for the session
+func (p *ptySession) SetReadDeadline(t time.Time) error {
+	return p.session.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets the write deadline for the session
+func (p *ptySession) SetWriteDeadline(t time.Time) error {
+	return p.session.SetWriteDeadline(t)
+}

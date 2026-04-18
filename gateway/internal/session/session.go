@@ -8,6 +8,13 @@ import (
     "golang.org/x/crypto/ssh"
 )
 
+// ReadWriteCloserWithDeadline is an interface that extends io.ReadWriteCloser with deadline methods
+type ReadWriteCloserWithDeadline interface {
+    io.ReadWriteCloser
+    SetReadDeadline(t time.Time) error
+    SetWriteDeadline(t time.Time) error
+}
+
 type PromptState int
 
 const (
@@ -21,7 +28,7 @@ type Session struct {
     UserID          string
     HostID          string
     SSHClient       *ssh.Client
-    ShellStream     io.ReadWriteCloser
+    ShellStream     ReadWriteCloserWithDeadline
     Cols            int
     Rows            int
     State           State

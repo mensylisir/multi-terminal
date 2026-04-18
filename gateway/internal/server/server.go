@@ -1,11 +1,14 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/mensylisir/multi-terminal/gateway/internal/session"
 )
 
 var upgrader = websocket.Upgrader{
@@ -17,10 +20,12 @@ var upgrader = websocket.Upgrader{
 }
 
 type Hub struct {
-	IDGen       uint32
-	ConnMap     sync.Map
-	Register    chan *Conn
-	Unregister  chan *Conn
+	IDGen            uint32
+	ConnMap          sync.Map
+	Register         chan *Conn
+	Unregister       chan *Conn
+	SessionManager   *session.Manager
+	ReconnectHandler *session.ReconnectHandler
 }
 
 func NewHub() *Hub {
@@ -28,6 +33,12 @@ func NewHub() *Hub {
 		Register:   make(chan *Conn),
 		Unregister: make(chan *Conn),
 	}
+}
+
+// SetSessionManager sets the session manager and creates reconnect handler
+func (h *Hub) SetSessionManager(mgr *session.Manager) {
+	h.SessionManager = mgr
+	h.ReconnectHandler = session.NewReconnectHandler(mgr)
 }
 
 func (h *Hub) Run() {
@@ -61,6 +72,32 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+
+	// Check for reconnection request via sessionId query parameter
+	if sessionIDStr := r.URL.Query().Get("sessionId"); sessionIDStr != "" {
+		var sessionID uint32
+		if _, err := fmt.Sscanf(sessionIDStr, "%d", &sessionID); err == nil {
+			// Handle reconnection if session manager is available
+			if HubGlobal.SessionManager != nil && HubGlobal.ReconnectHandler != nil {
+				s, err := HubGlobal.ReconnectHandler.HandleReconnect(sessionID)
+				if err == nil && s != nil {
+					// Reconnection successful
+					// Note: Buffer replay would be handled by the router when session attaches
+					// For now, we just mark the session as attached
+					conn := NewConn(sessionID, ws)
+					HubGlobal.Register <- conn
+					go conn.WritePump()
+					go conn.ReadPump(func(msg []byte) {
+						// Handle incoming messages
+						conn.Send <- msg
+					})
+					return
+				}
+			}
+		}
+	}
+
+	// New connection
 	conn := NewConn(0, ws)
 	HubGlobal.Register <- conn
 	go conn.WritePump()
