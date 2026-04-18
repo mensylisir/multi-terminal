@@ -60,11 +60,15 @@
 
 #### 字段详细说明：
 - **FrameType (1 Byte)**: 表示帧的指令类型，定义了接收端应对此帧采取的动作。
-  - `0x01` - 心跳 (Heartbeat): 用于保持连接活跃，防止负载均衡器或 NAT 超时切断连接。通常 Data 块可以为空。
-  - `0x02` - 终端输出 (Terminal Output): Gateway 向浏览器发送的远端 PTY 的标准输出（Stdout/Stderr）流。
+  - `0x01` - 心跳 (Heartbeat): 用于保持连接活跃，防止负载均衡器或 NAT 超时切断连接。通常 Data 块可以为空（长度 0）。
+  - `0x02` - 终端输出 (Terminal Output): Gateway 向浏览器发送的远端 PTY 的标准输出流。
+    - **Data Payload**: 纯粹的终端字节流，可能包含 ANSI 控制转义序列，前端解包后直接送给 `xterm.js` 的 `write()` 方法处理。
   - `0x03` - 终端输入 (Terminal Input): 浏览器向 Gateway 发送的用户键盘或鼠标交互指令。
-  - `0x04` - 窗口调整 (Window Resize): 浏览器向后端发送，携带终端重置大小事件。此时 Data 内容通常为紧凑编码的 `Cols` 和 `Rows` 整数对。
+    - **Data Payload**: UTF-8 编码的用户输入字符，或者特殊的终端控制字符（如 `0x03` 代表 Ctrl+C）。
+  - `0x04` - 窗口调整 (Window Resize): 浏览器向后端发送，携带终端重置大小事件。
+    - **Data Payload**: 固定长度 4 Bytes。前 2 字节为 `Cols` (uint16)，后 2 字节为 `Rows` (uint16)。例如：`[0x00, 0x50, 0x00, 0x18]` 代表 80列 24行。
   - `0x05` - 会话控制 (Session Control): 用于前端发送新建连接或主动销毁连接的信号。
+    - **Data Payload**: UTF-8 编码的 JSON 字符串，例如 `{"action": "create", "hostId": "web-01"}`。
 - **SessionCount (1 Byte)**: 此帧包含的 Session 数据块数量，支持单帧携带多会话数据（最大 255）。
 - **Session 数据块 (循环 SessionCount 次)**:
   - **SessionId (4 Bytes)**: `uint32` 类型，唯一标识一个终端会话。
