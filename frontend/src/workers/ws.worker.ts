@@ -1,5 +1,8 @@
 import { parseFrame, FrameType } from './parser';
 
+// Confirm frame type for risk confirmation requests
+const CONFIRM_FRAME_TYPE = 0x08;
+
 interface WorkerMessage {
   type: 'send' | 'connect' | 'disconnect' | 'resize' | 'input';
   payload?: any;
@@ -54,6 +57,13 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
       ws.onmessage = (event) => {
         const frame = parseFrame(event.data);
         if (frame) {
+          // Check if this is a confirm frame (risk confirmation request)
+          if (frame.type === CONFIRM_FRAME_TYPE) {
+            // Parse confirmation request and forward to main thread
+            const confirmData = JSON.parse(new TextDecoder().decode(frame.sessions[0]?.data));
+            self.postMessage({ type: 'confirm', payload: confirmData });
+            return;
+          }
           // Check if this is an input echo (should be locked)
           if (frame.type === FrameType.TerminalOutput) {
             for (const block of frame.sessions) {

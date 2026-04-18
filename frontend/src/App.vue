@@ -16,15 +16,19 @@
         <Terminal :sessionId="session.id" ref="terminals" />
       </div>
     </div>
+    <ConfirmModal />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useClientStore } from './stores/client';
+import { useRiskStore } from './stores/risk';
 import Terminal from './components/Terminal.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
 
 const clientStore = useClientStore();
+const riskStore = useRiskStore();
 const activeId = computed(() => clientStore.activeSessionId);
 const selectedIds = computed(() => clientStore.selectedSessionIds);
 const mode = computed(() => clientStore.mode);
@@ -59,6 +63,10 @@ onMounted(() => {
           }
         }
       }
+    } else if (e.data.type === 'confirm') {
+      // Handle risk confirmation request
+      const { sessionId, command, message } = e.data.payload;
+      riskStore.requestConfirmation(sessionId, command, message);
     } else if (e.data.type === 'closed') {
       console.log('Connection closed');
     }
