@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
+      - ssh-server
+    networks:
+      - testnet
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - testnet
+
+  ssh-server:
+    image: lscr.io/linuxcontainers/alpine:latest
+    command: ["/bin/sh", "-c", "apk add --no-cache openssh-server && ssh-keygen -A && /usr/sbin/sshd"]
+    ports:
+      - "2222:22"
+    networks:
+      - testnet
+
+networks:
+  testnet:
