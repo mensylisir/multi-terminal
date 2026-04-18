@@ -1,0 +1,27 @@
+[Unit]
+Description=Multi-Terminal Gateway
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=gateway
+Group=gateway
+WorkingDirectory=/opt/gateway
+ExecStart=/opt/gateway/gateway --config /etc/gateway/config.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Environment
+Environment=SERVER_PORT=8080
+Environment=REDIS_ADDR=localhost:6379
+Environment=LOG_LEVEL=info
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gateway
+
+[Install]
+WantedBy=multi-user.target
