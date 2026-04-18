@@ -116,6 +116,40 @@ func (e *Engine) Check(command string) (*Rule, RiskLevel, Action) {
 	return nil, RiskLevelLow, ActionAllow
 }
 
+// CheckAndBlock evaluates command and returns whether to block
+func (e *Engine) CheckAndBlock(command string) (bool, *Rule) {
+	rule, _, action := e.Check(command)
+	if action == ActionBlock {
+		return true, rule
+	}
+	return false, nil
+}
+
+// CheckAndConfirm evaluates command and returns whether to require confirmation
+func (e *Engine) CheckAndConfirm(command string) (bool, *Rule) {
+	rule, _, action := e.Check(command)
+	if action == ActionConfirm {
+		return true, rule
+	}
+	return false, nil
+}
+
+// GetBlockMessage returns the formatted block message for a rule
+func (e *Engine) GetBlockMessage(rule *Rule) string {
+	if rule == nil {
+		return ""
+	}
+	return fmt.Sprintf("\r\n\x1b[31m[BLOCKED]\x1b[0m %s\r\n", rule.Message)
+}
+
+// GetConfirmMessage returns the formatted confirm message for a rule
+func (e *Engine) GetConfirmMessage(rule *Rule) string {
+	if rule == nil {
+		return ""
+	}
+	return fmt.Sprintf("\r\n\x1b[33m[CONFIRM]\x1b[0m %s\r\n", rule.Message)
+}
+
 // AddDefaultRules loads the default risk rules
 func (e *Engine) AddDefaultRules() error {
 	defaultRules := []RuleConfig{

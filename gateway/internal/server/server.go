@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/mensylisir/multi-terminal/gateway/internal/risk"
 	"github.com/mensylisir/multi-terminal/gateway/internal/session"
 )
 
@@ -67,6 +68,32 @@ func (h *Hub) Broadcast(data []byte) {
 
 var HubGlobal = NewHub()
 
+var riskEngine = risk.NewEngine()
+
+func init() {
+	riskEngine.AddDefaultRules()
+}
+
+// handleInput handles terminal input with risk checking
+func handleInput(sessionID uint32, data []byte) (bool, []byte) {
+	command := string(data)
+
+	// Check if blocked
+	if blocked, rule := riskEngine.CheckAndBlock(command); blocked {
+		msg := riskEngine.GetBlockMessage(rule)
+		return false, []byte(msg)
+	}
+
+	// Check if confirmation required
+	if confirm, rule := riskEngine.CheckAndConfirm(command); confirm {
+		msg := riskEngine.GetConfirmMessage(rule)
+		// Return confirmation required signal
+		return true, []byte(msg)
+	}
+
+	return true, data
+}
+
 func HandleWS(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -102,7 +129,14 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 	HubGlobal.Register <- conn
 	go conn.WritePump()
 	go conn.ReadPump(func(msg []byte) {
-		// Echo back for testing
-		conn.Send <- msg
+		// Handle input with risk checking
+		allowed, output := handleInput(conn.ID, msg)
+		if !allowed {
+			// Command was blocked, send block message
+			conn.Send <- output
+			return
+		}
+		// For now, echo back for testing (or forward to session)
+		conn.Send <- output
 	})
 }
