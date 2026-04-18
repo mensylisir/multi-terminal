@@ -1,11 +1,16 @@
 <template>
-  <div ref="terminalRef" class="terminal-container"></div>
+  <div ref="terminalRef" class="terminal-container" :class="{ slow: isSlowSession, tui: isTuiSession }">
+    <div v-if="isTuiSession" class="tui-overlay">
+      <span>环境异常锁定</span>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { useTerminalStore } from '../stores/terminal';
 import '@xterm/xterm/css/xterm.css';
 
 const props = defineProps<{
@@ -20,6 +25,12 @@ const terminalRef = ref<HTMLElement | null>(null);
 let terminal: Terminal | null = null;
 let webglAddon: WebglAddon | null = null;
 let webglEnabled = false;
+
+const terminalStore = useTerminalStore();
+
+// Precise selectors - only re-compute when this specific session changes
+const isSlowSession = computed(() => terminalStore.isSlow(props.sessionId));
+const isTuiSession = computed(() => terminalStore.tuiState(props.sessionId));
 
 // rAF throttling
 let outputQueue: string[] = [];
@@ -124,5 +135,25 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   min-height: 400px;
+  position: relative;
+}
+
+.terminal-container.slow {
+  background: rgba(255, 200, 0, 0.2);
+}
+
+.tui-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  z-index: 10;
 }
 </style>
