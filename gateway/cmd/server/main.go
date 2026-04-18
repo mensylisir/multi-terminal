@@ -10,14 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/mensylisir/multi-terminal/gateway/internal/config"
+	"github.com/mensylisir/multi-terminal/gateway/internal/server"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
+var HubGlobal = server.HubGlobal
 
 func main() {
 	if err := run(); err != nil {
@@ -43,7 +40,10 @@ func run() error {
 
 	// Create HTTP mux
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", handleWS)
+	mux.HandleFunc("/ws", server.HandleWS)
+
+	// Start Hub run loop
+	go HubGlobal.Run()
 
 	// Create HTTP server
 	server := &http.Server{
@@ -77,9 +77,4 @@ func run() error {
 
 	log.Println("server stopped gracefully")
 	return nil
-}
-
-func handleWS(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement WebSocket upgrade and session handling in Task 1.2
-	w.Write([]byte("TODO: implement WebSocket handler"))
 }
