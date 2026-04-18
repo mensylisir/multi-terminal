@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mensylisir/multi-terminal/gateway/internal/config"
+	"github.com/mensylisir/multi-terminal/gateway/internal/metrics"
 	"github.com/mensylisir/multi-terminal/gateway/internal/server"
 )
 
@@ -44,6 +45,7 @@ func run() error {
 	// Create HTTP mux
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", server.HandleWS)
+	mux.Handle("/metrics", metrics.Handler())
 
 	// Start Hub run loop
 	go HubGlobal.Run()
