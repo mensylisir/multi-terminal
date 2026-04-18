@@ -1,11 +1,15 @@
 import { parseFrame, FrameType } from './parser';
 
 interface WorkerMessage {
-  type: 'send' | 'connect' | 'disconnect' | 'resize';
+  type: 'send' | 'connect' | 'disconnect' | 'resize' | 'input';
   payload?: any;
 }
 
 let ws: WebSocket | null = null;
+
+// EchoLock management
+const echoLockSessions = new Set<number>();
+const pendingEchoFrames: Map<number, Uint8Array[]> = new Map();
 
 function createResizeFrame(sessionId: number, cols: number, rows: number): ArrayBuffer {
   const headerSize = 1 + 1 + 4 + 2 + 2; // FrameType + SessionCount + SessionId + Cols + Rows
@@ -19,6 +23,27 @@ function createResizeFrame(sessionId: number, cols: number, rows: number): Array
   return buf;
 }
 
+function handleInput(frame: { sessions: { sessionId: number; data: Uint8Array }[] }) {
+  // Set EchoLock for all sessions in the input
+  for (const block of frame.sessions) {
+    echoLockSessions.add(block.sessionId);
+    pendingEchoFrames.set(block.sessionId, []);
+  }
+
+  // 50ms 后释放锁
+  setTimeout(() => {
+    for (const block of frame.sessions) {
+      echoLockSessions.delete(block.sessionId);
+      // 处理积压的帧
+      const pending = pendingEchoFrames.get(block.sessionId) || [];
+      for (const data of pending) {
+        self.postMessage({ type: 'output', sessionId: block.sessionId, data });
+      }
+      pendingEchoFrames.delete(block.sessionId);
+    }
+  }, 50);
+}
+
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   const { type, payload } = e.data;
 
@@ -29,6 +54,18 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
       ws.onmessage = (event) => {
         const frame = parseFrame(event.data);
         if (frame) {
+          // Check if this is an input echo (should be locked)
+          if (frame.type === FrameType.TerminalOutput) {
+            for (const block of frame.sessions) {
+              if (echoLockSessions.has(block.sessionId)) {
+                // Queue the frame instead of delivering
+                const pending = pendingEchoFrames.get(block.sessionId) || [];
+                pending.push(block.data);
+                pendingEchoFrames.set(block.sessionId, pending);
+                continue;
+              }
+            }
+          }
           self.postMessage({ type: 'frame', payload: frame });
         }
       };
@@ -38,6 +75,13 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
       break;
 
     case 'send':
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+      }
+      break;
+
+    case 'input':
+      handleInput(payload);
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(payload);
       }

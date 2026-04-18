@@ -20,6 +20,26 @@ const terminalRef = ref<HTMLElement | null>(null);
 let terminal: Terminal | null = null;
 let webglAddon: WebglAddon | null = null;
 
+// rAF throttling
+let outputQueue: string[] = [];
+let rafId: number | null = null;
+
+function scheduleFlush() {
+  if (rafId !== null) return;
+  rafId = requestAnimationFrame(() => {
+    if (outputQueue.length > 0 && terminal) {
+      terminal.write(outputQueue.join(''));
+      outputQueue = [];
+    }
+    rafId = null;
+  });
+}
+
+function queueOutput(data: string) {
+  outputQueue.push(data);
+  scheduleFlush();
+}
+
 function initTerminal() {
   if (!terminalRef.value) return;
 
@@ -36,7 +56,6 @@ function initTerminal() {
     scrollback: 5000,
   });
 
-  // 尝试启用 WebGL
   try {
     webglAddon = new WebglAddon();
     terminal.loadAddon(webglAddon);
@@ -57,7 +76,7 @@ function handleResize() {
 }
 
 function writeToTerminal(data: string) {
-  terminal?.write(data);
+  queueOutput(data);
 }
 
 defineExpose({ writeToTerminal, resize: handleResize });
