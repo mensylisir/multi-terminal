@@ -4,7 +4,7 @@
     <div class="status">{{ connected ? '已连接' : '未连接' }}</div>
     <button @click="connect">连接</button>
     <div class="terminal-grid">
-      <Terminal :sessionId="1" ref="term1" />
+      <Terminal :sessionId="1" ref="term1" @resize="handleResize" />
     </div>
   </div>
 </template>
@@ -34,6 +34,10 @@ function connect() {
   setTimeout(() => {
     term1.value?.writeToTerminal('Welcome to Multi-Terminal\r\n$ ');
   }, 100);
+}
+
+function handleResize(payload: { sessionId: number; cols: number; rows: number }) {
+  worker?.postMessage({ type: 'resize', payload });
 }
 </script>
 
