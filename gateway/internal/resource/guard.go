@@ -78,6 +78,11 @@ func (g *Guard) PreFlight() error {
 
 // GetCurrentFDUsage returns the current number of open file descriptors
 func (g *Guard) GetCurrentFDUsage() (int, error) {
+	return GetCurrentFDUsage()
+}
+
+// GetCurrentFDUsage is a standalone function to get current FD usage
+func GetCurrentFDUsage() (int, error) {
 	// Read /proc/self/fd to count open files
 	f, err := os.Open("/proc/self/fd")
 	if err != nil {

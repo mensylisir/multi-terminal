@@ -3,11 +3,14 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 
+	"github.com/mensylisir/multi-terminal/gateway/internal/resource"
 	"github.com/mensylisir/multi-terminal/gateway/internal/risk"
 	"github.com/mensylisir/multi-terminal/gateway/internal/session"
 )
@@ -27,6 +30,8 @@ type Hub struct {
 	Unregister       chan *Conn
 	SessionManager   *session.Manager
 	ReconnectHandler *session.ReconnectHandler
+	RateLimiter      *resource.RateLimiter
+	CircuitBreaker   *resource.CircuitBreaker
 }
 
 func NewHub() *Hub {
@@ -34,6 +39,13 @@ func NewHub() *Hub {
 		Register:   make(chan *Conn),
 		Unregister: make(chan *Conn),
 	}
+}
+
+// InitResourceGuard initializes the rate limiter and circuit breaker
+func (h *Hub) InitResourceGuard(fdLimit uint64) {
+	h.RateLimiter = resource.NewRateLimiter(1*time.Minute, 100)
+	h.CircuitBreaker = resource.NewCircuitBreaker(fdLimit)
+	h.CircuitBreaker.Start()
 }
 
 // SetSessionManager sets the session manager and creates reconnect handler
@@ -94,7 +106,48 @@ func handleInput(sessionID uint32, data []byte) (bool, []byte) {
 	return true, data
 }
 
+// extractIP extracts the client IP address from the request
+func extractIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxies)
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		// Take the first IP in the list
+		if idx := strings.Index(xff, ","); idx != -1 {
+			xff = xff[:idx]
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	xri := r.Header.Get("X-Real-IP")
+	if xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	addr := r.RemoteAddr
+	if idx := strings.Index(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
+}
+
 func HandleWS(w http.ResponseWriter, r *http.Request) {
+	// Get client IP
+	ip := extractIP(r)
+
+	// Check rate limit
+	if HubGlobal.RateLimiter != nil && !HubGlobal.RateLimiter.Allow(ip) {
+		http.Error(w, "Rate limit exceeded", 429)
+		return
+	}
+
+	// Check circuit breaker
+	if HubGlobal.CircuitBreaker != nil && !HubGlobal.CircuitBreaker.AllowConnection() {
+		http.Error(w, "Service temporarily unavailable", 503)
+		return
+	}
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
