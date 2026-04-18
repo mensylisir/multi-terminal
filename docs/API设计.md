@@ -7,8 +7,29 @@
 系统核心通信采用 WebSocket 二进制帧实现多路复用，这要求所有的 API 交互基于帧（Frame）的设计理念。
 
 ### 1.1 连接建立与鉴权
-- **握手阶段**: 客户端发起 WSS (WebSocket Secure) 连接请求，附带用户认证信息（Token）。
-- **初始化阶段**: 网关校验 Token 后，下发全局的初始化配置项（如资源配额、环境参数、权限策略）。
+- **握手阶段**: 客户端发起 WSS (WebSocket Secure) 连接请求，附带用户认证信息（Token）。通常可以在 URL Query 中携带，例如 `wss://gateway.example.com/ws?token=eyJhbG...`。
+- **初始化阶段 (Auth & Config)**:
+  - 建立连接后，网关首先校验 Token。
+  - 若鉴权通过，服务端下发一条全局的初始化配置项（作为二进制中的一条特殊的 Session Control 控制帧，或初始 JSON 负载）。
+
+  *初始化下发数据结构示例：*
+  ```json
+  {
+    "type": "INIT_ACK",
+    "data": {
+      "userId": "admin_001",
+      "quotas": {
+        "maxSessions": 20,
+        "maxMultiexec": 10
+      },
+      "config": {
+        "heartbeatIntervalMs": 10000,
+        "riskLevel": "high"
+      }
+    }
+  }
+  ```
+  - 若鉴权失败，服务端立即返回状态码 401 或特定的错误帧，然后关闭 WebSocket。
 - **心跳保活**: 客户端需每隔固定时间发送心跳包（Ping），服务端响应 Pong，长时间无响应将触发连接断开与会话挂起流程。
 
 ## 2. 二进制帧结构详解
