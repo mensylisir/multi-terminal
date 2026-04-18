@@ -12,6 +12,7 @@ import (
 
 	"github.com/mensylisir/multi-terminal/gateway/internal/config"
 	"github.com/mensylisir/multi-terminal/gateway/internal/metrics"
+	"github.com/mensylisir/multi-terminal/gateway/internal/resource"
 	"github.com/mensylisir/multi-terminal/gateway/internal/server"
 )
 
@@ -30,6 +31,12 @@ func run() error {
 	}
 
 	cfg := config.Get()
+
+	// Pre-flight check for system resources
+	guard := resource.NewGuard(resource.DefaultMaxSessions)
+	if err := guard.PreFlight(); err != nil {
+		return fmt.Errorf("pre-flight check failed: %w", err)
+	}
 
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
