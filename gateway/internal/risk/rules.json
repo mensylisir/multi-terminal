@@ -1,0 +1,39 @@
+{
+  "risk_rules": [
+    {
+      "id": "rule_rm_rf_root",
+      "pattern": "^rm\\s+-r[fF]?\\s+/(?!\\w)",
+      "level": "high",
+      "action": "block",
+      "message": "高危操作拦截：禁止删除根目录或关键系统目录"
+    },
+    {
+      "id": "rule_service_restart",
+      "pattern": "^(systemctl|service)\\s+(restart|stop|halt)",
+      "level": "medium",
+      "action": "confirm",
+      "message": "您正在尝试停止或重启基础服务，请确认该操作不影响业务"
+    },
+    {
+      "id": "rule_mkfs",
+      "pattern": "^mkfs",
+      "level": "high",
+      "action": "block",
+      "message": "高危操作拦截：禁止执行 mkfs"
+    },
+    {
+      "id": "rule_reboot",
+      "pattern": "^reboot|^shutdown|^init\\s+0|^init\\s+6",
+      "level": "medium",
+      "action": "confirm",
+      "message": "系统将重启，请确认操作"
+    },
+    {
+      "id": "rule_drop_table",
+      "pattern": "^drop\\s+table",
+      "level": "high",
+      "action": "block",
+      "message": "高危操作拦截：禁止删除数据库表"
+    }
+  ]
+}
