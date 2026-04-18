@@ -44,11 +44,6 @@ func (c *Client) OpenPTY(cols, rows int) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 
-	win := ssh.Window{
-		Width:  cols,
-		Height: rows,
-	}
-
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 14400,
@@ -112,12 +107,12 @@ func (p *ptySession) Close() error {
 	return p.session.Close()
 }
 
-// SetReadDeadline sets the read deadline for the session
+// SetReadDeadline sets the read deadline - no-op since ssh.Session doesn't support it
 func (p *ptySession) SetReadDeadline(t time.Time) error {
-	return p.session.SetReadDeadline(t)
+	return nil
 }
 
-// SetWriteDeadline sets the write deadline for the session
+// SetWriteDeadline sets the write deadline - no-op since ssh.Session doesn't support it
 func (p *ptySession) SetWriteDeadline(t time.Time) error {
-	return p.session.SetWriteDeadline(t)
+	return nil
 }

@@ -2,7 +2,6 @@ package audit
 
 import (
 	"regexp"
-	"strings"
 )
 
 var (

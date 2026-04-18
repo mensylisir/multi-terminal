@@ -40,7 +40,7 @@ func NewService(logDir string) (*Service, error) {
 	}
 
 	// Create Zstd encoder
-	encoder, err := zstd.NewWriter(nil, zstd.WithCompressionLevel(zstd.SpeedDefault))
+	encoder, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, fmt.Errorf("create zstd encoder: %w", err)
 	}
