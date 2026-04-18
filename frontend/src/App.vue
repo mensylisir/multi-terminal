@@ -1,65 +1,109 @@
 <template>
   <div class="container">
     <h1>Multi-Terminal</h1>
-    <div class="status">{{ connected ? '已连接' : '未连接' }}</div>
-    <button @click="connect">连接</button>
+    <div class="toolbar">
+      <span>模式: {{ mode }}</span>
+      <span>已选: {{ selectedIds.join(', ') || '无' }}</span>
+    </div>
     <div class="terminal-grid">
-      <Terminal :sessionId="1" ref="term1" @resize="handleResize" />
+      <div
+        v-for="session in sessions"
+        :key="session.id"
+        :class="['terminal-wrapper', { active: session.id === activeId, selected: clientStore.isSelected(session.id), slow: session.isSlow }]"
+        @click="handleClick(session.id)"
+        @click.shift="handleShiftClick(session.id)"
+      >
+        <Terminal :sessionId="session.id" ref="terminals" />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useClientStore } from './stores/client';
 import Terminal from './components/Terminal.vue';
 
-const connected = ref(false);
-const term1 = ref<InstanceType<typeof Terminal> | null>(null);
-let worker: Worker | null = null;
+const clientStore = useClientStore();
+const activeId = computed(() => clientStore.activeSessionId);
+const selectedIds = computed(() => clientStore.selectedSessionIds);
+const mode = computed(() => clientStore.mode);
 
-function connect() {
+interface SessionInfo {
+  id: number;
+  isSlow: boolean;
+}
+
+const sessions = ref<SessionInfo[]>([
+  { id: 1, isSlow: false },
+  { id: 2, isSlow: false },
+  { id: 3, isSlow: false },
+]);
+
+let worker: Worker | null = null;
+let terminals: Record<number, any> = {};
+
+onMounted(() => {
+  // Worker initialization
   worker = new Worker(new URL('./workers/ws.worker.ts', import.meta.url), {
     type: 'module',
   });
   worker.onmessage = (e) => {
     if (e.data.type === 'frame') {
-      console.log('Received frame:', e.data.payload);
+      const frame = e.data.payload;
+      if (frame.type === 0x06) { // SlowWarning
+        for (const block of frame.sessions) {
+          const session = sessions.value.find(s => s.id === block.sessionId);
+          if (session) {
+            session.isSlow = block.data.isSlow;
+          }
+        }
+      }
     } else if (e.data.type === 'closed') {
-      connected.value = false;
+      console.log('Connection closed');
     }
   };
   worker.postMessage({ type: 'connect', payload: { url: 'ws://localhost:8080/ws' } });
-  connected.value = true;
-  // 模拟输出
-  setTimeout(() => {
-    term1.value?.writeToTerminal('Welcome to Multi-Terminal\r\n$ ');
-  }, 100);
+});
+
+function handleClick(id: number) {
+  clientStore.selectOnly(id);
 }
 
-function handleResize(payload: { sessionId: number; cols: number; rows: number }) {
-  worker?.postMessage({ type: 'resize', payload });
+function handleShiftClick(id: number) {
+  clientStore.toggleSelect(id);
 }
 </script>
+
+<style scoped>
+.toolbar {
+  padding: 10px;
+  background: #2d2d2d;
+  color: #d4d4d4;
+  margin-bottom: 10px;
+}
+.terminal-wrapper {
+  border: 2px solid transparent;
+}
+.terminal-wrapper.active {
+  border-color: #0066cc;
+}
+.terminal-wrapper.selected {
+  border-color: #00cc66;
+}
+.terminal-wrapper.slow {
+  background: rgba(255, 200, 0, 0.2);
+}
+</style>
 
 <style>
 .container {
   padding: 20px;
-}
-.status {
-  margin: 10px 0;
-  font-weight: bold;
 }
 .terminal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
   gap: 10px;
   margin-top: 20px;
-}
-button {
-  padding: 8px 16px;
-  background: #0066cc;
-  color: white;
-  border: none;
-  cursor: pointer;
 }
 </style>
