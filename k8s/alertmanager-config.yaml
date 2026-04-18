@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+type: Opaque
+stringData:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'default-receiver'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          continue: true
+        - match:
+            alertname: 'FDUsageHigh'
+          receiver: 'critical-alerts'
+          continue: true
+        - match:
+            alertname: 'SSHSessionLimit'
+          receiver: 'warning-alerts'
+    receivers:
+      - name: 'default-receiver'
+        webhook_configs:
+          - url: 'http://gateway:8080/webhook'
+      - name: 'critical-alerts'
+        webhook_configs:
+          - url: 'http://gateway:8080/webhook'
+            send_resolved: true
+      - name: 'warning-alerts'
+        webhook_configs:
+          - url: 'http://gateway:8080/webhook'
+            send_resolved: true

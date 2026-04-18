@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  gateway-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Gateway Metrics",
+        "uid": "gateway",
+        "version": 1,
+        "panels": [
+          {
+            "title": "Active Connections",
+            "type": "stat",
+            "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+            "targets": [
+              {
+                "expr": "gateway_active_connections",
+                "legendFormat": "Connections"
+              }
+            ]
+          },
+          {
+            "title": "SSH Sessions",
+            "type": "stat",
+            "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+            "targets": [
+              {
+                "expr": "gateway_ssh_sessions_total",
+                "legendFormat": "Sessions"
+              }
+            ]
+          },
+          {
+            "title": "File Descriptor Usage %",
+            "type": "gauge",
+            "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+            "targets": [
+              {
+                "expr": "gateway_fd_usage_percent",
+                "legendFormat": "FD Usage %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 70},
+                    {"color": "red", "value": 85}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Slow Nodes",
+            "type": "stat",
+            "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+            "targets": [
+              {
+                "expr": "gateway_slow_nodes_total",
+                "legendFormat": "Slow Nodes"
+              }
+            ]
+          },
+          {
+            "title": "Stream Router Latency (ms)",
+            "type": "timeseries",
+            "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.99, gateway_stream_router_latency_ms_bucket)",
+                "legendFormat": "p99"
+              },
+              {
+                "expr": "histogram_quantile(0.95, gateway_stream_router_latency_ms_bucket)",
+                "legendFormat": "p95"
+              }
+            ]
+          },
+          {
+            "title": "Request Rate",
+            "type": "timeseries",
+            "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "rate(gateway_requests_total[5m])",
+                "legendFormat": "{{method}} {{endpoint}}"
+              }
+            ]
+          }
+        ]
+      }
+    }
