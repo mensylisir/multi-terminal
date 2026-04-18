@@ -34,9 +34,12 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create graceful manager
+	gracefulMgr := server.NewGracefulManager(HubGlobal, "/var/run/gateway.sock", "1.0.0")
+
 	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
 
 	// Create HTTP mux
 	mux := http.NewServeMux()
@@ -63,7 +66,16 @@ func run() error {
 	}()
 
 	// Wait for shutdown signal
-	<-sigChan
+	for sig := range sigChan {
+		switch sig {
+		case syscall.SIGUSR2:
+			gracefulMgr.HandleUSR2Signal()
+		default:
+			log.Printf("Received signal %v, shutting down...", sig)
+			cancel()
+			break
+		}
+	}
 	log.Println("shutdown signal received")
 
 	// Create shutdown context with timeout
